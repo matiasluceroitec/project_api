@@ -34,9 +34,31 @@ def users():
         } for user in users
     ]
 
-@app.route('/users/<int:id>')
+@app.route(
+    '/users/<int:id>',
+    methods=['GET', 'PUT', 'PATCH', 'DELETE']
+)
 def user(id):
     user = User.query.get_or_404(id)
+    if request.method == 'PUT':
+        data = request.json
+        if 'email' and 'name' in data:
+            user.email = data['email']
+            user.name = data['name']
+            db.session.commit()
+
+    if request.method == 'PATCH':
+        data = request.json
+        if 'email' in data:
+            user.email = data['email']
+        if 'name' in data:
+            user.name = data['name']
+        db.session.commit()
+    if request.method == 'DELETE':
+        db.session.delete(user)
+        db.session.commit()
+        return {"Message": "Deleted user"}, 204
+
     return {
         "id": user.id,
         "name": user.name,
