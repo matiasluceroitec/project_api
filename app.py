@@ -4,6 +4,7 @@ from models import (
     Movie,
     User, 
 )
+from schemas import UserSchema
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = (
@@ -11,6 +12,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = (
 )
 app.config['SQLALCHEMY_TRACK_NOTIFICATIONS'] = False
 db.init_app(app)
+
 
 @app.route('/users', methods=['POST', 'GET'])
 def users():
@@ -33,6 +35,11 @@ def users():
             "email": user.email
         } for user in users
     ]
+
+@app.route('/users_from_ma', methods=['GET'])
+def users_from_ma():
+    users = User.query.all()
+    return UserSchema(many=True).dump(users), 200
 
 @app.route(
     '/users/<int:id>',
