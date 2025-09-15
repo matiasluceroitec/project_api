@@ -4,6 +4,8 @@ from models import (
     Movie,
     User, 
 )
+from schemas import UserSchema
+
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = (
@@ -29,14 +31,37 @@ def users():
     users = User.query.all()
     return [
         {
+            "id": user.id,
             "user": user.name,
             "email": user.email
         } for user in users
     ]
 
-@app.route('/users/<int:id>')
+@app.route('/users_from_ma')
+def users_from_ma():
+    users = User.query.all()
+    return UserSchema(many=True).dump(users)
+
+@app.route('/users/<int:id>', methods=['GET', 'PATCH', 'PUT', 'DELETE'])
 def user(id):
     user = User.query.get_or_404(id)
+    if request.method == 'PUT':
+        data = request.json
+        if 'name' and 'email' in data:
+            user.name = data['name']
+            user.email = data['email']
+            db.session.commit()
+    
+    if request.method == 'PATCH':
+        if 'name' in data:
+            user.name = data['name']
+        if 'email' in data:
+            user.email = data['email']
+        db.session.commit()
+    if request.method == 'DELETE':
+        db.session.delete(user)
+        db.session.commit()
+        return {"Message": "Deleted User"}, 204
     return {
         "id": user.id,
         "name": user.name,
