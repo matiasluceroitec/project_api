@@ -58,12 +58,8 @@ def user(id):
         db.session.delete(user)
         db.session.commit()
         return {"Message": "Deleted User"}, 204
-    return {
-        "id": user.id,
-        "name": user.name,
-        "email": user.email
-    }, 200
-
+    
+    return UserSchema().dump(user)
 
 @app.route('/movies')
 def movies():
