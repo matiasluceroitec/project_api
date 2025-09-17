@@ -4,6 +4,7 @@ from models import (
     Movie,
     User, 
 )
+from marshmallow import ValidationError
 from schemas import UserSchema
 
 
@@ -17,28 +18,14 @@ db.init_app(app)
 @app.route('/users', methods=['POST', 'GET'])
 def users():
     if request.method == 'POST':
-        data = request.json
-        name = data.get('name')
-        email = data.get('email')
-        new_user = User(name=name, email=email)
+        try:
+            data = UserSchema().load(request.json)
+        except ValidationError as error:
+            return {"Mensaje": f"Algo salio mal {error}"}
+        new_user = User(name=data.get('name'), email=data.get('email'))
         db.session.add(new_user)
         db.session.commit()
-        return {
-            "name":new_user.name,
-            "email":new_user.email
-        },201
-
-    users = User.query.all()
-    return [
-        {
-            "id": user.id,
-            "user": user.name,
-            "email": user.email
-        } for user in users
-    ]
-
-@app.route('/users_from_ma')
-def users_from_ma():
+        return UserSchema().dump(new_user)
     users = User.query.all()
     return UserSchema(many=True).dump(users)
 
@@ -46,18 +33,26 @@ def users_from_ma():
 def user(id):
     user = User.query.get_or_404(id)
     if request.method == 'PUT':
-        data = request.json
-        if 'name' and 'email' in data:
-            user.name = data['name']
-            user.email = data['email']
-            db.session.commit()
+        try: 
+            data = UserSchema().load(request.json)
+        except ValidationError as error:
+            return {"Mensaje": f"Algo salio mal {error}"}
+
+        user.name = data['name']
+        user.email = data['email']
+        db.session.commit()
     
     if request.method == 'PATCH':
+        try: 
+            data = UserSchema(partial=True).load(request.json)
+        except ValidationError as error:
+            return {"Mensaje": f"Algo salio mal {error}"}
         if 'name' in data:
             user.name = data['name']
         if 'email' in data:
             user.email = data['email']
         db.session.commit()
+
     if request.method == 'DELETE':
         db.session.delete(user)
         db.session.commit()
