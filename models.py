@@ -81,7 +81,7 @@ class UserCredentials(db.Model):
     __tablename__ = "user_credentials"
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(
-        db.Intenger,
+        db.Integer,
         db.ForeignKey("user.id"),
         unique=True,
         nullable=False
