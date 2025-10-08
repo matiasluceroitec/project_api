@@ -14,6 +14,7 @@ from schemas import UserSchema, RegisterSchema, LoginSchema
 
 
 class UserAPI(MethodView):
+    @jwt_required()
     def get(self):
         users = User.query.all()
         return UserSchema(many=True).dump(users)
@@ -96,10 +97,6 @@ class UserRegisterAPI(MethodView):
 
 
 class AuthLoginAPI(MethodView):
-    """User login endpoint.
-
-    Returns a JWT with minimal identity (id, email, role).
-    """
     def post(self):
         try:
             data = LoginSchema().load(request.json)
