@@ -1,3 +1,6 @@
+from datetime import datetime, timedelta
+from functools import wraps
+
 from flask import request
 from marshmallow import ValidationError
 from flask.views import MethodView
@@ -5,6 +8,7 @@ from flask_jwt_extended import (
     jwt_required,
     create_access_token,
     get_jwt_identity,
+    get_jwt
 )
 from passlib.hash import bcrypt
 
@@ -12,6 +16,19 @@ from app import db
 from models import User, UserCredentials
 from schemas import UserSchema, RegisterSchema, LoginSchema
 
+
+def role_required(*allowed_roles):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            claims = get_jwt()
+            role = claims.get('role')
+            if not role or role not in allowed_roles:
+                return {"Error":"Rol no autorizado"}
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+        
 
 class UserAPI(MethodView):
     @jwt_required()
@@ -34,9 +51,12 @@ class UserAPI(MethodView):
 
 
 class UserDetailAPI(MethodView):
+    @jwt_required()
+    @role_required('admin')
     def get(self, id):
         user = User.query.get_or_404(id)
         return UserSchema().dump(user), 200
+    
     
     def put(self, id):
         user = User.query.get_or_404(id)
@@ -107,10 +127,16 @@ class AuthLoginAPI(MethodView):
             return {"errors": {"credentials": ["Inválidas"]}}, 401
         if not bcrypt.verify(data["password"], user.credential.password_hash):
             return {"errors": {"credentials": ["Inválidas"]}}, 401
-        identity = {
+        identity = str(user.id)
+        additional_claims =  {
             "id": user.id,
             "email": user.email,
             "role": user.credential.role,
+            "name": user.name
         }
-        token = create_access_token(identity=identity)
+        token = create_access_token(
+            identity=identity,
+            additional_claims=additional_claims,
+            expires_delta=timedelta(minutes=15)
+        )
         return {"access_token": token}, 200
