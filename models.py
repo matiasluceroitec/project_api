@@ -77,17 +77,13 @@ class Review(db.Model):
     date = db.Column(db.Date)
 
 
-class UserCredentials(db.Model):
+class UserCredential(db.Model):
     __tablename__ = "user_credentials"
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(
-        db.Integer,
-        db.ForeignKey("users.id"),
-        unique=True,
-        nullable=False
-    )
-    password_hash = db.Column(db.String(256), nullable=False)
-    role = db.Column(db.String(50), nullable=False, default="user")
-    user = db.relationship(
-        "User", backref=db.backref("credential", uselist=False)
-    )
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128), nullable=False)
+    role = db.Column(db.String(20), nullable=False, default="user") #admin, moderador, user
+    user = db.relationship("User", backref=db.backref("credential", uselist=False))
+
+    def __str__(self) -> str:
+        return f"User Credentials for user id ={self.user_id}, role={self.role}"
