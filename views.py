@@ -1,20 +1,36 @@
-from flask import request
+from datetime import timedelta
+from flask import request, jsonify
 from marshmallow import ValidationError
 from flask.views import MethodView
-from flask_jwt_extended import (
+
+from passlib.hash import bcrypt
+from flask_jwt_extended import (  #pip install Flask-JWT-Extended
     jwt_required,
     create_access_token,
-    get_jwt_identity,
+    get_jwt,
+    get_jwt_identity
 )
-from passlib.hash import bcrypt
-
+from functools import wraps
+from typing import Any, Dict
 from app import db
-from models import User, UserCredentials
+from models import User, UserCredential
 from schemas import UserSchema, RegisterSchema, LoginSchema
 
 
+def role_required(*allowes_roles: str):
+    def decorator(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            claims = get_jwt()
+            role = claims.get('role')
+            if not role or role not in allowes_roles:
+                return {"error": "acceso denegado para el rol"}
+            return fn(*args, **kwargs)
+        return wrapper
+    return decorator
+
+
 class UserAPI(MethodView):
-    @jwt_required()
     def get(self):
         users = User.query.all()
         return UserSchema(many=True).dump(users)
@@ -34,10 +50,13 @@ class UserAPI(MethodView):
 
 
 class UserDetailAPI(MethodView):
+    @jwt_required()
+    @role_required("admin", "user")
     def get(self, id):
         user = User.query.get_or_404(id)
         return UserSchema().dump(user), 200
     
+    @role_required("admin")
     def put(self, id):
         user = User.query.get_or_404(id)
         try: 
@@ -49,6 +68,7 @@ class UserDetailAPI(MethodView):
         except ValidationError as err:
             return {"Error": err.messages}
 
+    @role_required("admin")
     def patch(self, id):
         user = User.query.get_or_404(id)
         try: 
@@ -61,7 +81,8 @@ class UserDetailAPI(MethodView):
             return UserSchema().dump(user), 200
         except ValidationError as err:
             return {"Error": err.messages}
-        
+    
+    @role_required("admin")
     def delete(self, id):
         user = User.query.get_or_404(id)
         try:
@@ -80,37 +101,47 @@ class UserRegisterAPI(MethodView):
             return {"Error": err}
         
         if User.query.filter_by(email=data['email']).first():
-            return {"Error": "Email en uso"}
+            return jsonify({"Error": "Email en uso"})
         
-        new_user = User(name=data["name"], email=data['email'])
+        new_user = User(name=data['name'], email=data['email'])
         db.session.add(new_user)
-        db.session.flush()
+        db.session.flush() # sincroniza la db sin hacer el commit (asigna a User un id)
+        
         password_hash = bcrypt.hash(data['password'])
-        credenciales = UserCredentials(
-            user_id=new_user.id,
+        credenciales = UserCredential(
+            user_id=new_user.id, 
             password_hash=password_hash,
             role=data['role']
-        )
+        )  
         db.session.add(credenciales)
         db.session.commit()
         return UserSchema().dump(new_user)
-
-
-class AuthLoginAPI(MethodView):
+    
+class LoginAPI(MethodView):
     def post(self):
         try:
             data = LoginSchema().load(request.json)
         except ValidationError as err:
-            return {"errors": err.messages}, 400
+            return {"Error": err}
+        
         user = User.query.filter_by(email=data["email"]).first()
+
         if not user or not user.credential:
-            return {"errors": {"credentials": ["Inválidas"]}}, 401
+            return {"error": "no posee credenciales"}
+        
         if not bcrypt.verify(data["password"], user.credential.password_hash):
-            return {"errors": {"credentials": ["Inválidas"]}}, 401
-        identity = {
-            "id": user.id,
+            return {"error": "Credenciales invalidas"}
+
+        additional_claims = {
             "email": user.email,
             "role": user.credential.role,
+            "name": user.name
         }
-        token = create_access_token(identity=identity)
-        return {"access_token": token}, 200
+        identity = str(user.id)
+        token = create_access_token(
+            identity=identity, 
+            additional_claims=additional_claims, 
+            expires_delta=timedelta(minutes=5)
+        )
+
+        return jsonify(access_token=token)

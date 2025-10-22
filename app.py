@@ -6,7 +6,7 @@ from models import (
     Review
 )
 from schemas import ReviewSchema
-from views import UserAPI, UserDetailAPI, UserRegisterAPI, AuthLoginAPI
+from views import UserAPI, UserDetailAPI, UserRegisterAPI, LoginAPI
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = (
@@ -30,14 +30,15 @@ app.add_url_rule(
 )
 app.add_url_rule(
     '/register',
-    view_func=UserRegisterAPI.as_view('user_register_api'),
+    view_func=UserRegisterAPI.as_view("register_api"),
     methods=['POST']
 )
 app.add_url_rule(
     '/login',
-    view_func=AuthLoginAPI.as_view('user_user_api'),
+    view_func=LoginAPI.as_view("login"),
     methods=['POST']
 )
+
 
 @app.route('/reviews')
 def reviews():
